@@ -81,7 +81,9 @@ O único sistema que olha os três bancos é o **robô de análises**, e só **l
 - `jornada_conferencia`
 - `abastecimentos`
 - `despesas`
+- `recebimentos`
 - `avisos`
+- `multas`
 - `ordens_servico`
 - `trocas_oleo`
 - `tipos_despesa`
@@ -92,6 +94,9 @@ O único sistema que olha os três bancos é o **robô de análises**, e só **l
 - `clientes_dist`
 - `rotas`
 - `entregas`
+- `notas_fiscais`
+- `nf_itens`
+- `pedidos`
 - `produtos`
 
 ## 6. Antes de publicar
