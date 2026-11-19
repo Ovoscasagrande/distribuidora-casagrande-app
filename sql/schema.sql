@@ -1,18 +1,18 @@
 -- ==========================================================================
 -- CASAGRANDE — DISTRIBUIDORA · schema completo
--- banco INDEPENDENTE: este SQL cria tudo que o app distribuidora usa.
--- Rodar no SQL Editor do projeto Supabase da DISTRIBUIDORA.
+-- Banco INDEPENDENTE. Gerado da estrutura real de produção.
+-- Colunas "empresa"/"empresas" removidas: cada banco JÁ é uma empresa.
 -- Idempotente: pode rodar mais de uma vez.
 -- ==========================================================================
 
 create extension if not exists "pgcrypto";
 
--- ---------------------------------------------------------------- usuarios
+-- ------------------------------------------------------------------ usuarios
 create table if not exists public."usuarios" (
-  "id" uuid primary key default gen_random_uuid(),
+  "id" uuid primary key,
   "nome" text,
   "perfil" text,
-  "ativo" boolean,
+  "ativo" boolean default true,
   "criado_em" timestamptz default now(),
   "email" text,
   "cpf" text,
@@ -20,14 +20,14 @@ create table if not exists public."usuarios" (
   "cnh_categoria" text,
   "cnh_validade" date,
   "contato" text,
-  "perfis_extra" jsonb,
-  "is_master" boolean
+  "perfis_extra" jsonb default '[]'::jsonb,
+  "is_master" boolean default false
 );
--- liga o perfil ao usuário do Supabase Auth
+-- o perfil vive no mesmo id do usuário do Auth
 alter table public."usuarios" drop constraint if exists usuarios_id_fkey;
 alter table public."usuarios" add constraint usuarios_id_fkey foreign key (id) references auth.users(id) on delete cascade;
 
--- ---------------------------------------------------------------- motoristas
+-- ------------------------------------------------------------------ motoristas
 create table if not exists public."motoristas" (
   "id" uuid primary key default gen_random_uuid(),
   "usuario_id" uuid,
@@ -37,13 +37,13 @@ create table if not exists public."motoristas" (
   "cnh_categoria" text,
   "cnh_validade" date,
   "contato" text,
-  "situacao" text,
-  "ativo" boolean,
+  "situacao" text default 'incompleto',
+  "ativo" boolean default true,
   "criado_em" timestamptz default now()
 );
 create index if not exists "motoristas_usuario_id_idx" on public."motoristas" ("usuario_id");
 
--- ---------------------------------------------------------------- veiculos
+-- ------------------------------------------------------------------ veiculos
 create table if not exists public."veiculos" (
   "id" uuid primary key default gen_random_uuid(),
   "placa" text,
@@ -52,69 +52,68 @@ create table if not exists public."veiculos" (
   "modelo" text,
   "ano" integer,
   "cor" text,
-  "ativo" boolean,
+  "ativo" boolean default true,
   "intervalo_oleo_km" integer,
   "ultima_troca_oleo_km" integer,
   "ultima_troca_oleo_data" date,
   "criado_em" timestamptz default now(),
-  "km_atual" double precision,
-  "proxima_manutencao_km" integer
+  "km_atual" numeric,
+  "proxima_manutencao_km" numeric
 );
 
--- ---------------------------------------------------------------- motorista_veiculo
+-- ------------------------------------------------------------------ motorista_veiculo
 create table if not exists public."motorista_veiculo" (
   "id" uuid primary key default gen_random_uuid(),
   "motorista_id" uuid,
   "veiculo_id" uuid,
-  "ativo" boolean
+  "ativo" boolean default true
 );
 create index if not exists "motorista_veiculo_motorista_id_idx" on public."motorista_veiculo" ("motorista_id");
 create index if not exists "motorista_veiculo_veiculo_id_idx" on public."motorista_veiculo" ("veiculo_id");
 
--- ---------------------------------------------------------------- veiculos_documentos
+-- ------------------------------------------------------------------ veiculos_documentos
 create table if not exists public."veiculos_documentos" (
   "id" uuid primary key default gen_random_uuid(),
   "veiculo_id" uuid,
-  "tipo" text,
+  "tipo" text default 'CRLV-e',
   "arquivo_path" text,
-  "vencimento" text,
-  "enviado_por" text,
+  "vencimento" date,
+  "enviado_por" uuid,
   "criado_em" timestamptz default now()
 );
 create index if not exists "veiculos_documentos_veiculo_id_idx" on public."veiculos_documentos" ("veiculo_id");
 
--- ---------------------------------------------------------------- postos
+-- ------------------------------------------------------------------ postos
 create table if not exists public."postos" (
   "id" uuid primary key default gen_random_uuid(),
   "nome" text,
-  "ativo" boolean,
+  "ativo" boolean default true,
   "criado_em" timestamptz default now()
 );
 
--- ---------------------------------------------------------------- jornadas
+-- ------------------------------------------------------------------ jornadas
 create table if not exists public."jornadas" (
   "id" uuid primary key default gen_random_uuid(),
   "motorista_id" uuid,
   "veiculo_id" uuid,
   "roteiro" integer,
-  "km_inicial" double precision,
-  "km_final" double precision,
-  "inicio" timestamptz,
+  "km_inicial" numeric,
+  "km_final" numeric,
+  "inicio" timestamptz default now(),
   "fim" timestamptz,
   "ocorrencias" text,
-  "status" text,
-  "conferida_por" text,
+  "status" text default 'aberta',
+  "conferida_por" uuid,
   "conferida_em" timestamptz,
-  "roteiros_extra" jsonb,
+  "roteiros_extra" jsonb default '[]'::jsonb,
   "motivo_cancelamento" text,
-  "cancelada_por" text,
-  "cancelada_em" text
+  "cancelada_por" uuid,
+  "cancelada_em" timestamptz
 );
 create index if not exists "jornadas_motorista_id_idx" on public."jornadas" ("motorista_id");
 create index if not exists "jornadas_veiculo_id_idx" on public."jornadas" ("veiculo_id");
-create index if not exists "jornadas_conferida_por_idx" on public."jornadas" ("conferida_por");
 
--- ---------------------------------------------------------------- jornada_carregamentos
+-- ------------------------------------------------------------------ jornada_carregamentos
 create table if not exists public."jornada_carregamentos" (
   "id" uuid primary key default gen_random_uuid(),
   "jornada_id" uuid,
@@ -123,44 +122,44 @@ create table if not exists public."jornada_carregamentos" (
   "observacao" text,
   "criado_em" timestamptz default now()
 );
+create index if not exists "jornada_carregamentos_jornada_id_idx" on public."jornada_carregamentos" ("jornada_id");
 create index if not exists "jornada_carregamentos_motorista_id_idx" on public."jornada_carregamentos" ("motorista_id");
 create index if not exists "jornada_carregamentos_veiculo_id_idx" on public."jornada_carregamentos" ("veiculo_id");
-create index if not exists "jornada_carregamentos_jornada_id_idx" on public."jornada_carregamentos" ("jornada_id");
 
--- ---------------------------------------------------------------- jornada_conferencia
+-- ------------------------------------------------------------------ jornada_conferencia
 create table if not exists public."jornada_conferencia" (
   "id" uuid primary key default gen_random_uuid(),
   "jornada_id" uuid,
   "item" text,
   "ok" boolean,
   "obs" text,
-  "conferido_por" text,
+  "conferido_por" uuid,
   "conferido_em" timestamptz
 );
 create index if not exists "jornada_conferencia_jornada_id_idx" on public."jornada_conferencia" ("jornada_id");
 
--- ---------------------------------------------------------------- abastecimentos
+-- ------------------------------------------------------------------ abastecimentos
 create table if not exists public."abastecimentos" (
   "id" uuid primary key default gen_random_uuid(),
   "jornada_id" uuid,
   "motorista_id" uuid,
   "veiculo_id" uuid,
-  "data" timestamptz,
+  "data" timestamptz default now(),
   "posto" text,
-  "km" double precision,
+  "km" numeric,
   "combustivel" text,
-  "litros" double precision,
-  "preco_litro" double precision,
-  "valor_total" double precision,
+  "litros" numeric,
+  "preco_litro" numeric,
+  "valor_total" numeric,
   "foto_path" text,
-  "parcial" boolean,
+  "parcial" boolean default false,
   "criado_em" timestamptz default now()
 );
+create index if not exists "abastecimentos_jornada_id_idx" on public."abastecimentos" ("jornada_id");
 create index if not exists "abastecimentos_motorista_id_idx" on public."abastecimentos" ("motorista_id");
 create index if not exists "abastecimentos_veiculo_id_idx" on public."abastecimentos" ("veiculo_id");
-create index if not exists "abastecimentos_jornada_id_idx" on public."abastecimentos" ("jornada_id");
 
--- ---------------------------------------------------------------- despesas
+-- ------------------------------------------------------------------ despesas
 create table if not exists public."despesas" (
   "id" uuid primary key default gen_random_uuid(),
   "jornada_id" uuid,
@@ -168,91 +167,129 @@ create table if not exists public."despesas" (
   "veiculo_id" uuid,
   "categoria" text,
   "descricao" text,
-  "data" timestamptz,
-  "km" double precision,
-  "valor" double precision,
+  "data" timestamptz default now(),
+  "km" numeric,
+  "valor" numeric,
   "foto_path" text,
   "obs" text,
-  "status" text,
+  "status" text default 'aguardando',
   "motivo_reprovacao" text,
-  "aprovada_por" text,
+  "aprovada_por" uuid,
   "aprovada_em" timestamptz,
-  "reembolsada_em" text,
+  "reembolsada_em" timestamptz,
   "criado_em" timestamptz default now(),
-  "extras" jsonb
+  "extras" jsonb default '{}'::jsonb
 );
+create index if not exists "despesas_jornada_id_idx" on public."despesas" ("jornada_id");
 create index if not exists "despesas_motorista_id_idx" on public."despesas" ("motorista_id");
 create index if not exists "despesas_veiculo_id_idx" on public."despesas" ("veiculo_id");
-create index if not exists "despesas_jornada_id_idx" on public."despesas" ("jornada_id");
-create index if not exists "despesas_aprovada_por_idx" on public."despesas" ("aprovada_por");
 
--- ---------------------------------------------------------------- avisos
+-- ------------------------------------------------------------------ recebimentos
+create table if not exists public."recebimentos" (
+  "id" uuid primary key default gen_random_uuid(),
+  "tipo" text,
+  "valor" numeric,
+  "veiculo_id" uuid,
+  "motorista_id" uuid,
+  "data" timestamptz default now(),
+  "foto_path" text,
+  "obs" text,
+  "extras" jsonb default '{}'::jsonb,
+  "lancado_por" uuid,
+  "criado_em" timestamptz default now()
+);
+create index if not exists "recebimentos_veiculo_id_idx" on public."recebimentos" ("veiculo_id");
+create index if not exists "recebimentos_motorista_id_idx" on public."recebimentos" ("motorista_id");
+
+-- ------------------------------------------------------------------ avisos
 create table if not exists public."avisos" (
   "id" uuid primary key default gen_random_uuid(),
   "motorista_id" uuid,
   "veiculo_id" uuid,
   "categoria" text,
   "texto" text,
-  "fotos" jsonb,
-  "status" text,
+  "fotos" jsonb default '[]'::jsonb,
+  "status" text default 'recebido',
   "criado_em" timestamptz default now(),
-  "atualizado_em" timestamptz
+  "atualizado_em" timestamptz default now()
 );
 create index if not exists "avisos_motorista_id_idx" on public."avisos" ("motorista_id");
 create index if not exists "avisos_veiculo_id_idx" on public."avisos" ("veiculo_id");
 
--- ---------------------------------------------------------------- ordens_servico
+-- ------------------------------------------------------------------ multas
+create table if not exists public."multas" (
+  "id" uuid primary key default gen_random_uuid(),
+  "veiculo_id" uuid,
+  "motorista_id" uuid,
+  "orgao" text,
+  "data_infracao" date,
+  "data_recebimento" date,
+  "prazo" date,
+  "valor" numeric,
+  "notificacao_path" text,
+  "obs" text,
+  "status" text default 'aguardando_ciencia',
+  "ciencia_em" timestamptz,
+  "cadastrada_por" uuid,
+  "criado_em" timestamptz default now()
+);
+create index if not exists "multas_veiculo_id_idx" on public."multas" ("veiculo_id");
+create index if not exists "multas_motorista_id_idx" on public."multas" ("motorista_id");
+
+-- ------------------------------------------------------------------ ordens_servico
 create table if not exists public."ordens_servico" (
   "id" uuid primary key default gen_random_uuid(),
   "aviso_id" uuid,
   "veiculo_id" uuid,
-  "aberta_por" text,
+  "aberta_por" uuid,
   "descricao" text,
   "diagnostico" text,
   "servico" text,
   "pecas" text,
-  "mao_obra" double precision,
-  "custos" double precision,
-  "km" double precision,
-  "fotos" jsonb,
-  "status" text,
+  "mao_obra" numeric,
+  "custos" numeric,
+  "km" numeric,
+  "fotos" jsonb default '[]'::jsonb,
+  "status" text default 'recebida',
   "mecanico_id" uuid,
-  "aberta_em" timestamptz,
+  "aberta_em" timestamptz default now(),
   "concluida_em" timestamptz
 );
+create index if not exists "ordens_servico_aviso_id_idx" on public."ordens_servico" ("aviso_id");
 create index if not exists "ordens_servico_veiculo_id_idx" on public."ordens_servico" ("veiculo_id");
+create index if not exists "ordens_servico_mecanico_id_idx" on public."ordens_servico" ("mecanico_id");
 
--- ---------------------------------------------------------------- trocas_oleo
+-- ------------------------------------------------------------------ trocas_oleo
 create table if not exists public."trocas_oleo" (
   "id" uuid primary key default gen_random_uuid(),
   "veiculo_id" uuid,
-  "km" double precision,
+  "km" numeric,
   "data" date,
   "obs" text,
-  "registrado_por" text,
+  "registrado_por" uuid,
   "criado_em" timestamptz default now()
 );
 create index if not exists "trocas_oleo_veiculo_id_idx" on public."trocas_oleo" ("veiculo_id");
 
--- ---------------------------------------------------------------- tipos_despesa
+-- ------------------------------------------------------------------ tipos_despesa
 create table if not exists public."tipos_despesa" (
   "id" uuid primary key default gen_random_uuid(),
   "nome" text,
-  "campos" jsonb,
-  "ativo" boolean,
+  "campos" jsonb default '[]'::jsonb,
+  "ativo" boolean default true,
   "criado_em" timestamptz default now()
 );
 
--- ---------------------------------------------------------------- tipos_recebimento
+-- ------------------------------------------------------------------ tipos_recebimento
 create table if not exists public."tipos_recebimento" (
   "id" uuid primary key default gen_random_uuid(),
   "nome" text,
-  "campos" jsonb,
-  "ativo" boolean,
+  "campos" jsonb default '[]'::jsonb,
+  "ativo" boolean default true,
   "criado_em" timestamptz default now()
 );
 
--- ---------------------------------------------------------------- auditoria
+-- ------------------------------------------------------------------ auditoria
 create table if not exists public."auditoria" (
   "id" uuid primary key default gen_random_uuid(),
   "usuario_id" uuid,
@@ -262,30 +299,30 @@ create table if not exists public."auditoria" (
 );
 create index if not exists "auditoria_usuario_id_idx" on public."auditoria" ("usuario_id");
 
--- ---------------------------------------------------------------- notificacoes
+-- ------------------------------------------------------------------ notificacoes
 create table if not exists public."notificacoes" (
   "id" uuid primary key default gen_random_uuid(),
   "usuario_id" uuid,
   "titulo" text,
   "corpo" text,
-  "lida" boolean,
+  "lida" boolean default false,
   "criado_em" timestamptz default now(),
   "link" text
 );
 create index if not exists "notificacoes_usuario_id_idx" on public."notificacoes" ("usuario_id");
 
--- ---------------------------------------------------------------- convites
+-- ------------------------------------------------------------------ convites
 create table if not exists public."convites" (
-  "token" text,
+  "token" uuid,
   "perfil" text,
-  "criado_por" text,
+  "criado_por" uuid,
   "criado_em" timestamptz default now(),
-  "expira_em" timestamptz,
-  "usado_em" text,
-  "usado_por" text
+  "expira_em" timestamptz default now(),
+  "usado_em" timestamptz,
+  "usado_por" uuid
 );
 
--- ---------------------------------------------------------------- clientes_dist
+-- ------------------------------------------------------------------ clientes_dist
 create table if not exists public."clientes_dist" (
   "id" uuid primary key default gen_random_uuid(),
   "nome" text,
@@ -297,83 +334,130 @@ create table if not exists public."clientes_dist" (
   "lat" double precision,
   "lng" double precision,
   "obs" text,
-  "ativo" boolean,
+  "ativo" boolean default true,
   "criado_em" timestamptz default now(),
   "curva" text,
   "freq" text,
   "tier" text,
-  "fat_hist" text,
-  "fat_2026" text,
+  "fat_hist" numeric,
+  "fat_2026" numeric,
   "produto_fav" text,
   "bairro" text,
   "vendedor_id" uuid,
   "tabela" text,
   "dia_rota" text,
-  "pendente_erp" boolean,
-  "ultima_visita" text
+  "pendente_erp" boolean default false,
+  "ultima_visita" date
 );
+create index if not exists "clientes_dist_vendedor_id_idx" on public."clientes_dist" ("vendedor_id");
 
--- ---------------------------------------------------------------- rotas
+-- ------------------------------------------------------------------ rotas
 create table if not exists public."rotas" (
   "id" uuid primary key default gen_random_uuid(),
   "data" date,
   "motorista_id" uuid,
   "veiculo_id" uuid,
-  "status" text,
-  "sequencia" jsonb,
-  "km_inicial" double precision,
-  "km_final" double precision,
-  "inicio" text,
-  "fim" text,
+  "status" text default 'distribuida',
+  "sequencia" jsonb default '[]'::jsonb,
+  "km_inicial" numeric,
+  "km_final" numeric,
+  "inicio" timestamptz,
+  "fim" timestamptz,
   "criado_em" timestamptz default now(),
-  "roteiro" integer
+  "roteiro" bigint
 );
 create index if not exists "rotas_motorista_id_idx" on public."rotas" ("motorista_id");
 create index if not exists "rotas_veiculo_id_idx" on public."rotas" ("veiculo_id");
 
--- ---------------------------------------------------------------- entregas
+-- ------------------------------------------------------------------ entregas
 create table if not exists public."entregas" (
   "id" uuid primary key default gen_random_uuid(),
   "rota_id" uuid,
   "ordem" integer,
   "cliente_id" uuid,
   "nf_id" uuid,
-  "nfs_extra" jsonb,
-  "status" text,
-  "chegada_em" text,
-  "entregue_em" text,
+  "nfs_extra" jsonb default '[]'::jsonb,
+  "status" text default 'pendente',
+  "chegada_em" timestamptz,
+  "entregue_em" timestamptz,
   "motivo" text,
   "foto_path" text,
   "criado_em" timestamptz default now(),
-  "ordem_escolhida" text,
+  "ordem_escolhida" integer,
   "foto_canhoto" text,
   "motivo_recusa" text,
   "concluida_em" timestamptz,
-  "carga" jsonb,
-  "carga_ok" text
+  "carga" jsonb default '[]'::jsonb,
+  "carga_ok" boolean
 );
 create index if not exists "entregas_rota_id_idx" on public."entregas" ("rota_id");
 create index if not exists "entregas_cliente_id_idx" on public."entregas" ("cliente_id");
+create index if not exists "entregas_nf_id_idx" on public."entregas" ("nf_id");
 
--- ---------------------------------------------------------------- produtos
+-- ------------------------------------------------------------------ notas_fiscais
+create table if not exists public."notas_fiscais" (
+  "id" uuid primary key default gen_random_uuid(),
+  "numero" text,
+  "cliente_id" uuid,
+  "vendedor" text,
+  "comprador" text,
+  "criado_em" timestamptz default now(),
+  "pedido_path" text,
+  "pedido_obs" text
+);
+create index if not exists "notas_fiscais_cliente_id_idx" on public."notas_fiscais" ("cliente_id");
+
+-- ------------------------------------------------------------------ nf_itens
+create table if not exists public."nf_itens" (
+  "id" uuid primary key default gen_random_uuid(),
+  "nf_id" uuid,
+  "codigo" text,
+  "descricao" text,
+  "unid" text default 'UN',
+  "qtd" numeric default 0,
+  "criado_em" timestamptz default now()
+);
+create index if not exists "nf_itens_nf_id_idx" on public."nf_itens" ("nf_id");
+
+-- ------------------------------------------------------------------ pedidos
+create table if not exists public."pedidos" (
+  "id" uuid primary key default gen_random_uuid(),
+  "vendedor_id" uuid,
+  "cliente_id" uuid,
+  "cliente_nome" text,
+  "receita" numeric default 0,
+  "cmv" numeric default 0,
+  "lucro" numeric default 0,
+  "margem" numeric default 0,
+  "comissao_pct" numeric default 0,
+  "comissao_rs" numeric default 0,
+  "status" text default 'salvo',
+  "itens" jsonb default '[]'::jsonb,
+  "whatsapp" text,
+  "criado_em" timestamptz default now()
+);
+create index if not exists "pedidos_vendedor_id_idx" on public."pedidos" ("vendedor_id");
+create index if not exists "pedidos_cliente_id_idx" on public."pedidos" ("cliente_id");
+
+-- ------------------------------------------------------------------ produtos
 create table if not exists public."produtos" (
   "id" uuid primary key default gen_random_uuid(),
   "nome" text,
   "sku" text,
-  "unidade" text,
-  "ativo" boolean,
+  "unidade" text default 'UN',
+  "ativo" boolean default true,
   "criado_em" timestamptz default now(),
-  "custo" text,
-  "tabelas" jsonb,
+  "custo" numeric,
+  "tabelas" jsonb default '{}'::jsonb,
   "un" text,
-  "est_disp" text,
-  "mg_real" text,
-  "queima" boolean,
-  "interno" boolean
+  "est_disp" numeric,
+  "mg_real" numeric,
+  "queima" boolean default false,
+  "interno" boolean default false
 );
 
 -- ==========================================================================
--- RLS — cada tabela só é acessível por quem tem login aprovado
+-- RLS
 -- ==========================================================================
 alter table public."usuarios" enable row level security;
 alter table public."motoristas" enable row level security;
@@ -386,7 +470,9 @@ alter table public."jornada_carregamentos" enable row level security;
 alter table public."jornada_conferencia" enable row level security;
 alter table public."abastecimentos" enable row level security;
 alter table public."despesas" enable row level security;
+alter table public."recebimentos" enable row level security;
 alter table public."avisos" enable row level security;
+alter table public."multas" enable row level security;
 alter table public."ordens_servico" enable row level security;
 alter table public."trocas_oleo" enable row level security;
 alter table public."tipos_despesa" enable row level security;
@@ -397,12 +483,12 @@ alter table public."convites" enable row level security;
 alter table public."clientes_dist" enable row level security;
 alter table public."rotas" enable row level security;
 alter table public."entregas" enable row level security;
+alter table public."notas_fiscais" enable row level security;
+alter table public."nf_itens" enable row level security;
+alter table public."pedidos" enable row level security;
 alter table public."produtos" enable row level security;
 
 
--- ---------------------------------------------------------------------------
--- helpers
--- ---------------------------------------------------------------------------
 create or replace function public.meu_perfil()
 returns text language sql stable security definer set search_path = public as $$
   select coalesce((select u.perfil from public.usuarios u where u.id = auth.uid()), 'pendente');
@@ -422,9 +508,6 @@ grant execute on function public.meu_perfil()       to authenticated, anon;
 grant execute on function public.meu_motorista_id() to authenticated, anon;
 grant execute on function public.eh_master()        to authenticated, anon;
 
--- ---------------------------------------------------------------------------
--- policies
--- ---------------------------------------------------------------------------
 drop policy if exists usuarios_sel on public."usuarios";
 create policy usuarios_sel on public."usuarios" for select to authenticated using (id = auth.uid() or public.meu_perfil() = 'gerencia');
 drop policy if exists usuarios_ins on public."usuarios";
@@ -502,12 +585,26 @@ create policy despesas_ins on public."despesas" for insert to authenticated with
 drop policy if exists despesas_upd on public."despesas";
 create policy despesas_upd on public."despesas" for update to authenticated using (true);
 
+drop policy if exists recebimentos_sel on public."recebimentos";
+create policy recebimentos_sel on public."recebimentos" for select to authenticated using (true);
+drop policy if exists recebimentos_ins on public."recebimentos";
+create policy recebimentos_ins on public."recebimentos" for insert to authenticated with check (true);
+drop policy if exists recebimentos_upd on public."recebimentos";
+create policy recebimentos_upd on public."recebimentos" for update to authenticated using (true);
+
 drop policy if exists avisos_sel on public."avisos";
 create policy avisos_sel on public."avisos" for select to authenticated using (true);
 drop policy if exists avisos_ins on public."avisos";
 create policy avisos_ins on public."avisos" for insert to authenticated with check (true);
 drop policy if exists avisos_upd on public."avisos";
 create policy avisos_upd on public."avisos" for update to authenticated using (true);
+
+drop policy if exists multas_sel on public."multas";
+create policy multas_sel on public."multas" for select to authenticated using (true);
+drop policy if exists multas_ins on public."multas";
+create policy multas_ins on public."multas" for insert to authenticated with check (true);
+drop policy if exists multas_upd on public."multas";
+create policy multas_upd on public."multas" for update to authenticated using (true);
 
 drop policy if exists ordens_servico_sel on public."ordens_servico";
 create policy ordens_servico_sel on public."ordens_servico" for select to authenticated using (true);
@@ -579,6 +676,27 @@ create policy entregas_ins on public."entregas" for insert to authenticated with
 drop policy if exists entregas_upd on public."entregas";
 create policy entregas_upd on public."entregas" for update to authenticated using (true);
 
+drop policy if exists notas_fiscais_sel on public."notas_fiscais";
+create policy notas_fiscais_sel on public."notas_fiscais" for select to authenticated using (true);
+drop policy if exists notas_fiscais_ins on public."notas_fiscais";
+create policy notas_fiscais_ins on public."notas_fiscais" for insert to authenticated with check (true);
+drop policy if exists notas_fiscais_upd on public."notas_fiscais";
+create policy notas_fiscais_upd on public."notas_fiscais" for update to authenticated using (true);
+
+drop policy if exists nf_itens_sel on public."nf_itens";
+create policy nf_itens_sel on public."nf_itens" for select to authenticated using (true);
+drop policy if exists nf_itens_ins on public."nf_itens";
+create policy nf_itens_ins on public."nf_itens" for insert to authenticated with check (true);
+drop policy if exists nf_itens_upd on public."nf_itens";
+create policy nf_itens_upd on public."nf_itens" for update to authenticated using (true);
+
+drop policy if exists pedidos_sel on public."pedidos";
+create policy pedidos_sel on public."pedidos" for select to authenticated using (true);
+drop policy if exists pedidos_ins on public."pedidos";
+create policy pedidos_ins on public."pedidos" for insert to authenticated with check (true);
+drop policy if exists pedidos_upd on public."pedidos";
+create policy pedidos_upd on public."pedidos" for update to authenticated using (true);
+
 drop policy if exists produtos_sel on public."produtos";
 create policy produtos_sel on public."produtos" for select to authenticated using (true);
 drop policy if exists produtos_ins on public."produtos";
@@ -588,19 +706,15 @@ create policy produtos_upd on public."produtos" for update to authenticated usin
 
 
 -- ===========================================================================
--- todo cadastro novo entra como PENDENTE e a gerência aprova
+-- todo cadastro novo entra PENDENTE; a gerência aprova
 -- ===========================================================================
 create or replace function public.novo_usuario()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.usuarios (id, nome, email, perfil, ativo)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'nome', split_part(new.email,'@',1)),
-    new.email,
-    'pendente',
-    false
-  )
+  values (new.id,
+          coalesce(new.raw_user_meta_data->>'nome', split_part(new.email,'@',1)),
+          new.email, 'pendente', false)
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -610,22 +724,9 @@ create trigger trg_novo_usuario
   after insert on auth.users
   for each row execute function public.novo_usuario();
 
-
--- ===========================================================================
--- RPCs de auto-cadastro e conferência
--- ===========================================================================
-create or replace function public.auto_cadastro_pendente(p_nome text)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.usuarios (id, nome, perfil, ativo, empresa)
-  values (auth.uid(), p_nome, 'pendente', false, 'DISTRIBUIDORA')
-  on conflict (id) do nothing;
-end $$;
-
 create or replace function public.veiculos_bloqueados()
 returns table (veiculo_id uuid) language sql stable security definer set search_path = public as $$
   select j.veiculo_id from public.jornadas j where j.status in ('aberta','conferencia');
 $$;
 
-grant execute on function public.auto_cadastro_pendente(text) to authenticated;
-grant execute on function public.veiculos_bloqueados()       to authenticated;
+grant execute on function public.veiculos_bloqueados() to authenticated;
